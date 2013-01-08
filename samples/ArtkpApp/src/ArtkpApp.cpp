@@ -124,6 +124,7 @@ void ArtkApp::update()
 
 	mFps = getAverageFps();
 
+	// switch between capture devices
 	if ( lastCapture != mCurrentCapture )
 	{
 		if ( ( lastCapture >= 0 ) && ( mCaptures[ lastCapture ] ) )
@@ -136,12 +137,12 @@ void ArtkApp::update()
 		lastCapture = mCurrentCapture;
 	}
 
+	// detect the markers
 	if ( mCapture && mCapture.checkNewFrame() )
 	{
 		Surface8u captSurf( mCapture.getSurface() );
 		mCaptTexture = gl::Texture( captSurf );
 		mArTracker.update( captSurf );
-
 	}
 }
 
@@ -152,6 +153,7 @@ void ArtkApp::draw()
 	gl::disableDepthRead();
 	gl::disableDepthWrite();
 
+	// draws camera image
 	gl::setViewport( getWindowBounds() );
 	gl::setMatricesWindow( getWindowSize() );
 
@@ -160,23 +162,28 @@ void ArtkApp::draw()
 	if ( mCaptTexture )
 		gl::draw( mCaptTexture, outputArea );
 
+	// places a cube on each detected marker
 	gl::enableDepthRead();
 	gl::enableDepthWrite();
+
 	gl::setViewport( outputArea );
+	// sets the projection matrix
 	mArTracker.setProjection();
 
-	Vec3d patternScale = Vec3d::one() * mArTracker.getPatternWidth();
+	// scales the pattern according th the pattern width
+	Vec3d patternScale = Vec3d::one() * mArTracker.getOptions().getPatternWidth();
 	for ( int i = 0; i < mArTracker.getNumMarkers(); i++ )
 	{
+		// id -1 means unknown marker, false positive
 		if ( mArTracker.getMarkerId( i ) == -1 )
 			continue;
 
+		// sets the modelview matrix of the i'th marker
 		mArTracker.setModelView( i );
 		gl::scale( patternScale );
-		gl::translate( Vec3f( 0.f, .0f, .5f ) );
+		gl::translate( Vec3f( 0.f, .0f, .5f ) ); // places the cube on the marker instead of the center
 		gl::drawColorCube( Vec3f::zero(), Vec3f::one() );
 	}
-
 
 	params::InterfaceGl::draw();
 }
