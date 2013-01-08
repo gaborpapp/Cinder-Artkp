@@ -1,0 +1,11 @@
+env = Environment()
+
+env['APP_TARGET'] = 'ArtkpApp'
+env['APP_SOURCES'] = ['ArtkpApp.cpp']
+env['ASSETS'] = ['camera_para.dat']
+env['DEBUG'] = 1
+
+env = SConscript('../../../scons/SConscript', exports = 'env')
+
+SConscript('../../../../../scons/SConscript', exports = 'env')
+

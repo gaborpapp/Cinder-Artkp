@@ -1,0 +1,23 @@
+import os
+
+Import('env')
+
+_ARTKP_INCLUDES = [Dir('../src/ARToolKitPlus/include').abspath]
+_ARTKP_SOURCES = ['MemoryManager.cpp',
+		'librpp/rpp.cpp',
+		'librpp/rpp_quintic.cpp',
+		'librpp/rpp_vecmat.cpp',
+		'librpp/rpp_svd.cpp',
+		'librpp/librpp.cpp',
+		'extra/Profiler.cpp']
+_ARTKP_SOURCES = [File('../src/ARToolKitPlus/src/' + s).abspath for s in _ARTKP_SOURCES]
+
+_SOURCES = ['ArTracker.cpp']
+_SOURCES = [File('../src/' + s).abspath for s in _SOURCES]
+_INCLUDES = [Dir('../src').abspath]
+
+env.Append(APP_SOURCES = _ARTKP_SOURCES + _SOURCES)
+env.Append(CPPPATH = _ARTKP_INCLUDES + _INCLUDES)
+
+Return('env')
+
