@@ -20,6 +20,7 @@
 #include "ArTracker.h"
 
 #include "ARToolKitPlus/TrackerSingleMarkerImpl.h"
+#include "ARToolKitPlus/TrackerMultiMarkerImpl.h"
 
 using namespace ci;
 
@@ -31,8 +32,16 @@ ArTracker::ArTracker( int32_t width, int32_t height, Options options ) :
 
 void ArTracker::update( Surface &surface )
 {
-	mObj->mTrackerRef->calc( surface.getData(), -1, false, &mObj->mMarkerInfo, &mObj->mNumMarkers );
-	// TODO filter out -1 ids from mMarkerInfo
+	if ( !mObj->mOptions.mMultiMarker )
+	{
+		// TODO filter out -1 ids from mMarkerInfo
+		mObj->mTrackerSingleRef->calc( surface.getData(), -1, false, &mObj->mMarkerInfo, &mObj->mNumMarkers );
+	}
+	else
+	{
+		mObj->mTrackerMultiRef->calc( surface.getData() );
+		mObj->mNumMarkers = mObj->mTrackerMultiRef->getNumDetectedMarkers();
+	}
 }
 
 int ArTracker::getNumMarkers() const
@@ -43,22 +52,49 @@ int ArTracker::getNumMarkers() const
 int ArTracker::getMarkerId( int i ) const
 {
 	if ( ( i >= 0 ) && ( i < mObj->mNumMarkers ) )
-		return mObj->mMarkerInfo[ i ].id;
+	{
+		if ( !mObj->mOptions.mMultiMarker )
+		{
+			return mObj->mMarkerInfo[ i ].id;
+		}
+		else
+		{
+			return mObj->mTrackerMultiRef->getDetectedMarker( i ).id;
+		}
+	}
 	else
+	{
 		throw ArTrackerExcMarkerIndexOutOfRange();
+	}
 }
 
 float ArTracker::getMarkerConfidence( int i ) const
 {
 	if ( ( i >= 0 ) && ( i < mObj->mNumMarkers ) )
-		return mObj->mMarkerInfo[ i ].cf;
+	{
+		if ( !mObj->mOptions.mMultiMarker )
+		{
+			return mObj->mMarkerInfo[ i ].cf;
+		}
+		else
+		{
+			return mObj->mTrackerMultiRef->getDetectedMarker( i ).cf;
+		}
+	}
 	else
+	{
 		throw ArTrackerExcMarkerIndexOutOfRange();
+	}
 }
 
 void ArTracker::setProjection() const
 {
-	const ARFloat *proj = mObj->mTrackerRef->getProjectionMatrix();
+	const ARFloat *proj;
+
+	if ( !mObj->mOptions.mMultiMarker )
+		proj = mObj->mTrackerSingleRef->getProjectionMatrix();
+	else
+		proj = mObj->mTrackerMultiRef->getProjectionMatrix();
 
 	glMatrixMode( GL_PROJECTION );
 #ifdef _USE_DOUBLE_ // ArtToolKit defines ARFloat precision
@@ -78,7 +114,36 @@ ci::Matrix44f ArTracker::getModelView( int i ) const
 	ARFloat patternWidth = mObj->mOptions.mPatternWidth;
 	ARFloat patternCenter[ 2 ] = { 0.f, 0.f };
 	ARFloat patternTrans[ 3 ][ 4 ];
-	mObj->mTrackerRef->executeSingleMarkerPoseEstimator( &mObj->mMarkerInfo[ i ], patternCenter, patternWidth, patternTrans );
+	if ( !mObj->mOptions.mMultiMarker )
+	{
+		// TODO: check the return value
+		// FIXME: calc has done this already, hasn't it? check where the transformation is stored
+		mObj->mTrackerSingleRef->executeSingleMarkerPoseEstimator( &mObj->mMarkerInfo[ i ], patternCenter, patternWidth, patternTrans );
+	}
+	else
+	{
+		const ARToolKitPlus::ARMultiMarkerInfoT *mmConfig = mObj->mTrackerMultiRef->getMultiMarkerConfig();
+
+#if 0
+		ARToolKitPlus::ARMarkerInfo markers[ mObj->mNumMarkers ];
+		for ( int i = 0; i < mObj->mNumMarkers; i++ )
+		{
+			markers[ i ] = mObj->mTrackerMultiRef->getDetectedMarker( i );
+		}
+
+		// TODO check the return value
+		// FIXME: calc has done this already, hasn't it?
+		mObj->mTrackerMultiRef->executeMultiMarkerPoseEstimator( markers, mObj->mNumMarkers, &mmConfig );
+		/*
+		if (result < 0 || result >= INT_MAX)
+		{
+			mObj->mTrackerMultiRef->arMultiGetTransMat( markers, mObj->mNumMarkers, &mmConfig );
+		}
+		*/
+#endif
+
+		memcpy( patternTrans, mmConfig->trans, sizeof( ARFloat ) * 12 );
+	}
 
 	for ( int j = 0; j < 3; j++ )
 	{
@@ -105,6 +170,15 @@ void ArTracker::setModelView( int i ) const
 
 ArTracker::Obj::Obj( int32_t width, int32_t height, Options options )
 {
+	// FIXME: try to use one tracker only if multi works with single markers
+
+	// NOTE camera parameter file is required, otherwise the image size is not set
+	// TODO check how this relates to width & height
+	if ( options.mCameraParamFile.empty() )
+	{
+		throw ArTrackerExcCameraFileNotFound();
+	}
+
 	/* - template based markers need 16x16 samples
 	 * - id based ones need 6, 12 or 18, TODO: in options
 	 * create a tracker that does:
@@ -114,53 +188,91 @@ ArTracker::Obj::Obj( int32_t width, int32_t height, Options options )
 	 *  - can load a maximum of 32 patterns, TODO: in options
 	 *  - can detect a maximum of 32 patterns in one image
 	 */
-	if ( options.mMode == MARKER_TEMPLATE )
-		mTrackerRef = std::shared_ptr< ARToolKitPlus::TrackerSingleMarker >(
-				new ARToolKitPlus::TrackerSingleMarkerImpl< 16, 16, 16, 32, 32 >( width, height ) );
-	else
-		mTrackerRef = std::shared_ptr< ARToolKitPlus::TrackerSingleMarker >(
-				new ARToolKitPlus::TrackerSingleMarkerImpl< 12, 12, 12, 32, 32 >( width, height ) );
-
-	if ( options.mLoggingEnabled )
-		mTrackerRef->setLogger( &mLogger );
-
-	// TODO set this in options
-	mTrackerRef->setPixelFormat( ARToolKitPlus::PIXEL_FORMAT_RGB );
-
-	// NOTE camera parameter file is required, otherwise the image size is not set
-	// TODO check how this relates to width & height
-	if ( options.mCameraParamFile.empty() )
+	if ( options.mMultiMarker )
 	{
-		throw ArTrackerExcCameraFileNotFound();
-	}
+		if ( options.mMode == MARKER_TEMPLATE )
+			mTrackerMultiRef = std::shared_ptr< ARToolKitPlus::TrackerMultiMarker >(
+					new ARToolKitPlus::TrackerMultiMarkerImpl< 16, 16, 16, 32, 32 >( width, height ) );
+		else
+			mTrackerMultiRef = std::shared_ptr< ARToolKitPlus::TrackerMultiMarker >(
+					new ARToolKitPlus::TrackerMultiMarkerImpl< 12, 12, 12, 32, 32 >( width, height ) );
 
-	if ( !mTrackerRef->init( options.mCameraParamFile.string().c_str(),
-				options.mNearPlane, options.mFarPlane ) )
-	{
-		throw ArTrackerExcInitFail();
-	}
+		if ( options.mLoggingEnabled )
+			mTrackerMultiRef->setLogger( &mLogger );
 
-	mTrackerRef->setPatternWidth( options.mPatternWidth );
-	if ( options.mMode == MARKER_ID_BCH )
-		mTrackerRef->setBorderWidth( 0.125f );
+		// TODO set this in options
+		mTrackerMultiRef->setPixelFormat( ARToolKitPlus::PIXEL_FORMAT_RGB );
+
+		if ( !mTrackerMultiRef->init( options.mCameraParamFile.string().c_str(),
+					options.mMultiMarkerFile.string().c_str(),
+					options.mNearPlane, options.mFarPlane ) )
+		{
+			throw ArTrackerExcInitFail();
+		}
+
+		// pattern width specified by marker config only
+		// mTrackerMultiRef->setPatternWidth( options.mPatternWidth );
+
+		if ( options.mMode == MARKER_ID_BCH )
+			mTrackerMultiRef->setBorderWidth( 0.125f );
+		else
+			mTrackerMultiRef->setBorderWidth( 0.250f );
+		mTrackerMultiRef->setUndistortionMode( ARToolKitPlus::UNDIST_STD );
+
+		mTrackerMultiRef->activateAutoThreshold( options.mThresholdAuto );
+
+		// NOTE: RPP "Robust Planar Pose" estimator does not work for 3d multi marker objects
+		mTrackerMultiRef->setPoseEstimator( ARToolKitPlus::POSE_ESTIMATOR_ORIGINAL );
+		//mTrackerMultiRef->setPoseEstimator( ARToolKitPlus::POSE_ESTIMATOR_ORIGINAL_CONT );
+
+		mTrackerMultiRef->setMarkerMode( static_cast< ARToolKitPlus::MARKER_MODE >( options.mMode ) );
+	}
 	else
-		mTrackerRef->setBorderWidth( 0.250f );
-	mTrackerRef->setUndistortionMode( ARToolKitPlus::UNDIST_STD );
+	{
+		if ( options.mMode == MARKER_TEMPLATE )
+			mTrackerSingleRef = std::shared_ptr< ARToolKitPlus::TrackerSingleMarker >(
+					new ARToolKitPlus::TrackerSingleMarkerImpl< 16, 16, 16, 32, 32 >( width, height ) );
+		else
+			mTrackerSingleRef = std::shared_ptr< ARToolKitPlus::TrackerSingleMarker >(
+					new ARToolKitPlus::TrackerSingleMarkerImpl< 12, 12, 12, 32, 32 >( width, height ) );
 
-	mTrackerRef->activateAutoThreshold( options.mThresholdAuto );
+		if ( options.mLoggingEnabled )
+			mTrackerSingleRef->setLogger( &mLogger );
 
-	// RPP is more robust than ARToolKit's standard pose estimator
-	mTrackerRef->setPoseEstimator( ARToolKitPlus::POSE_ESTIMATOR_RPP );
+		// TODO set this in options
+		mTrackerSingleRef->setPixelFormat( ARToolKitPlus::PIXEL_FORMAT_RGB );
 
-	mTrackerRef->setMarkerMode( static_cast< ARToolKitPlus::MARKER_MODE >( options.mMode ) );
+		if ( !mTrackerSingleRef->init( options.mCameraParamFile.string().c_str(),
+					options.mNearPlane, options.mFarPlane ) )
+		{
+			throw ArTrackerExcInitFail();
+		}
+
+		mTrackerSingleRef->setPatternWidth( options.mPatternWidth );
+		if ( options.mMode == MARKER_ID_BCH )
+			mTrackerSingleRef->setBorderWidth( 0.125f );
+		else
+			mTrackerSingleRef->setBorderWidth( 0.250f );
+		mTrackerSingleRef->setUndistortionMode( ARToolKitPlus::UNDIST_STD );
+
+		mTrackerSingleRef->activateAutoThreshold( options.mThresholdAuto );
+
+		// RPP is more robust than ARToolKit's standard pose estimator
+		mTrackerSingleRef->setPoseEstimator( ARToolKitPlus::POSE_ESTIMATOR_RPP );
+
+		mTrackerSingleRef->setMarkerMode( static_cast< ARToolKitPlus::MARKER_MODE >( options.mMode ) );
+
+	}
 
 	mOptions = options;
 }
 
 ArTracker::Obj::~Obj()
 {
-	if ( mTrackerRef )
-		mTrackerRef->cleanup();
+	if ( mTrackerSingleRef )
+		mTrackerSingleRef->cleanup();
+	if ( mTrackerMultiRef )
+		mTrackerMultiRef->cleanup();
 }
 
 } } // namespace mndl::artkp

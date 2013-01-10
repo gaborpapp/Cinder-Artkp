@@ -20,6 +20,7 @@
 #include <iostream>
 
 #include "ARToolKitPlus/TrackerSingleMarker.h"
+#include "ARToolKitPlus/TrackerMultiMarker.h"
 
 #include "cinder/app/App.h"
 #include "cinder/Cinder.h"
@@ -97,6 +98,9 @@ class ArTracker
 				//! Sets the camera parameter file path to \a cameraFile.
 				void setCameraFile( const ci::fs::path &cameraFile ) { mCameraParamFile = cameraFile; }
 
+				//! Sets the multi marker file path to \a cameraFile. Enables multi marker setup.
+				void setMultiMarker( const ci::fs::path &configFile ) { mMultiMarkerFile = configFile; mMultiMarker = true; }
+
 			protected:
 				MarkerMode mMode = MARKER_ID_SIMPLE;
 				float mNearPlane = 1.f;
@@ -104,8 +108,10 @@ class ArTracker
 				bool mLoggingEnabled = false;
 				float mPatternWidth = 80.f;
 				bool mThresholdAuto = true;
+				bool mMultiMarker = false;
 
 				ci::fs::path mCameraParamFile;
+				ci::fs::path mMultiMarkerFile;
 
 				friend class ArTracker;
 		};
@@ -116,7 +122,9 @@ class ArTracker
 			Obj( int32_t width, int32_t height, Options options );
 			~Obj();
 
-			std::shared_ptr< ARToolKitPlus::TrackerSingleMarker > mTrackerRef;
+			std::shared_ptr< ARToolKitPlus::TrackerSingleMarker > mTrackerSingleRef;
+			std::shared_ptr< ARToolKitPlus::TrackerMultiMarker > mTrackerMultiRef;
+
 			Logger mLogger;
 
 			Options mOptions;

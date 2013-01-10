@@ -29,7 +29,7 @@ using namespace ci;
 using namespace ci::app;
 using namespace std;
 
-class ArtkpApp : public AppBasic
+class MultiMarkerApp : public AppBasic
 {
 	public:
 		void setup();
@@ -61,7 +61,7 @@ class ArtkpApp : public AppBasic
 		float mFps;
 };
 
-void ArtkpApp::setup()
+void MultiMarkerApp::setup()
 {
 	gl::disableVerticalSync();
 
@@ -72,10 +72,11 @@ void ArtkpApp::setup()
 
 	mndl::artkp::ArTracker::Options options;
 	options.setCameraFile( getAssetPath( "camera_para.dat" ) );
+	options.setMultiMarker( getAssetPath( "marker_cube.cfg" ) );
 	mArTracker = mndl::artkp::ArTracker( CAPTURE_WIDTH, CAPTURE_HEIGHT, options );
 }
 
-void ArtkpApp::setupCapture()
+void MultiMarkerApp::setupCapture()
 {
 	// list out the capture devices
 	vector< Capture::DeviceRef > devices( Capture::getDevices() );
@@ -118,7 +119,7 @@ void ArtkpApp::setupCapture()
 	mParams.addParam( "Capture", deviceNames, &mCurrentCapture );
 }
 
-void ArtkpApp::update()
+void MultiMarkerApp::update()
 {
 	static int lastCapture = -1;
 
@@ -146,7 +147,7 @@ void ArtkpApp::update()
 	}
 }
 
-void ArtkpApp::draw()
+void MultiMarkerApp::draw()
 {
 	gl::clear( Color::black() );
 
@@ -181,14 +182,14 @@ void ArtkpApp::draw()
 		// sets the modelview matrix of the i'th marker
 		mArTracker.setModelView( i );
 		gl::scale( patternScale );
-		gl::translate( Vec3f( 0.f, .0f, .5f ) ); // places the cube on the marker instead of the center
 		gl::drawColorCube( Vec3f::zero(), Vec3f::one() );
+		break;
 	}
 
 	params::InterfaceGl::draw();
 }
 
-void ArtkpApp::shutdown()
+void MultiMarkerApp::shutdown()
 {
 	if ( mCapture )
 	{
@@ -197,5 +198,5 @@ void ArtkpApp::shutdown()
 }
 
 
-CINDER_APP_BASIC( ArtkpApp, RendererGl )
+CINDER_APP_BASIC( MultiMarkerApp, RendererGl )
 
