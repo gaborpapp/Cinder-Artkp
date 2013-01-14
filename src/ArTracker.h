@@ -77,6 +77,18 @@ class ArTracker
 		//! Sets the \c MODELVIEW matrix to reflect the values of the \a i'th marker. Leaves the \c MatrixMode as \c MODELVIEW.
 		void setModelView( int i ) const;
 
+		//! Enables automatic threshold calculation.
+		void enableAutoThreshold( bool enable = true );
+
+		//! Returns true if automatic threshold detection is enabled.
+		bool isAutoThresholdEnabled() const;
+
+		//! Sets the threshold value that is used for black/white conversion.
+		void setThreshold( int thres );
+
+		//! Returns the current threshold value.
+		int getThreshold() const;
+
 		//! Returns the ArTracker::Options of this ArTracker.
 		const Options& getOptions() { return mObj->mOptions; }
 

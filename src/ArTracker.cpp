@@ -134,12 +134,6 @@ ci::Matrix44f ArTracker::getModelView( int i ) const
 		// TODO check the return value
 		// FIXME: calc has done this already, hasn't it?
 		mObj->mTrackerMultiRef->executeMultiMarkerPoseEstimator( markers, mObj->mNumMarkers, &mmConfig );
-		/*
-		if (result < 0 || result >= INT_MAX)
-		{
-			mObj->mTrackerMultiRef->arMultiGetTransMat( markers, mObj->mNumMarkers, &mmConfig );
-		}
-		*/
 #endif
 
 		memcpy( patternTrans, mmConfig->trans, sizeof( ARFloat ) * 12 );
@@ -166,6 +160,38 @@ void ArTracker::setModelView( int i ) const
 
 	glMatrixMode( GL_MODELVIEW );
 	glLoadMatrixf( getModelView( i ).m );
+}
+
+void ArTracker::enableAutoThreshold( bool enable )
+{
+	if ( !mObj->mOptions.mMultiMarker )
+		mObj->mTrackerSingleRef->activateAutoThreshold( enable );
+	else
+		mObj->mTrackerMultiRef->activateAutoThreshold( enable );
+}
+
+bool ArTracker::isAutoThresholdEnabled() const
+{
+	if ( !mObj->mOptions.mMultiMarker )
+		return mObj->mTrackerSingleRef->isAutoThresholdActivated();
+	else
+		return mObj->mTrackerMultiRef->isAutoThresholdActivated();
+}
+
+void ArTracker::setThreshold( int thres )
+{
+	if ( !mObj->mOptions.mMultiMarker )
+		mObj->mTrackerSingleRef->setThreshold( thres );
+	else
+		mObj->mTrackerMultiRef->setThreshold( thres );
+}
+
+int ArTracker::getThreshold() const
+{
+	if ( !mObj->mOptions.mMultiMarker )
+		return mObj->mTrackerSingleRef->getThreshold();
+	else
+		return mObj->mTrackerMultiRef->getThreshold();
 }
 
 ArTracker::Obj::Obj( int32_t width, int32_t height, Options options )
@@ -195,7 +221,7 @@ ArTracker::Obj::Obj( int32_t width, int32_t height, Options options )
 					new ARToolKitPlus::TrackerMultiMarkerImpl< 16, 16, 16, 32, 32 >( width, height ) );
 		else
 			mTrackerMultiRef = std::shared_ptr< ARToolKitPlus::TrackerMultiMarker >(
-					new ARToolKitPlus::TrackerMultiMarkerImpl< 12, 12, 12, 32, 32 >( width, height ) );
+					new ARToolKitPlus::TrackerMultiMarkerImpl< 12, 12, 48, 32, 32 >( width, height ) );
 
 		if ( options.mLoggingEnabled )
 			mTrackerMultiRef->setLogger( &mLogger );
@@ -209,6 +235,7 @@ ArTracker::Obj::Obj( int32_t width, int32_t height, Options options )
 		{
 			throw ArTrackerExcInitFail();
 		}
+		mTrackerMultiRef->changeCameraSize( width, height );
 
 		// pattern width specified by marker config only
 		// mTrackerMultiRef->setPatternWidth( options.mPatternWidth );
@@ -220,6 +247,7 @@ ArTracker::Obj::Obj( int32_t width, int32_t height, Options options )
 		mTrackerMultiRef->setUndistortionMode( ARToolKitPlus::UNDIST_STD );
 
 		mTrackerMultiRef->activateAutoThreshold( options.mThresholdAuto );
+		mTrackerMultiRef->setImageProcessingMode( (ARToolKitPlus::IMAGE_PROC_MODE)( AR_IMAGE_PROC_IN_FULL ) );
 
 		// NOTE: RPP "Robust Planar Pose" estimator does not work for 3d multi marker objects
 		mTrackerMultiRef->setPoseEstimator( ARToolKitPlus::POSE_ESTIMATOR_ORIGINAL );
@@ -247,6 +275,7 @@ ArTracker::Obj::Obj( int32_t width, int32_t height, Options options )
 		{
 			throw ArTrackerExcInitFail();
 		}
+		mTrackerMultiRef->changeCameraSize( width, height );
 
 		mTrackerSingleRef->setPatternWidth( options.mPatternWidth );
 		if ( options.mMode == MARKER_ID_BCH )
