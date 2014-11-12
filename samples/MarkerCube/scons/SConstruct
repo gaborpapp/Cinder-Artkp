@@ -3,7 +3,7 @@ env = Environment()
 env['APP_TARGET'] = 'MarkerCubeApp'
 env['APP_SOURCES'] = ['MarkerCubeApp.cpp']
 env['ASSETS'] = ['camera_para.dat', 'marker_cube.cfg']
-env['DEBUG'] = 1
+env['DEBUG'] = 0
 
 env = SConscript('../../../scons/SConscript', exports = 'env')
 
