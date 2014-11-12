@@ -186,7 +186,7 @@ void MultiMarkerApp::draw()
 		break;
 	}
 
-	params::InterfaceGl::draw();
+	mParams.draw();
 }
 
 void MultiMarkerApp::shutdown()

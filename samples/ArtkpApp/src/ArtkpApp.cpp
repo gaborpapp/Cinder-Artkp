@@ -185,7 +185,7 @@ void ArtkpApp::draw()
 		gl::drawColorCube( Vec3f::zero(), Vec3f::one() );
 	}
 
-	params::InterfaceGl::draw();
+	mParams.draw();
 }
 
 void ArtkpApp::shutdown()
