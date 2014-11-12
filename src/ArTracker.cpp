@@ -275,7 +275,7 @@ ArTracker::Obj::Obj( int32_t width, int32_t height, Options options )
 		{
 			throw ArTrackerExcInitFail();
 		}
-		mTrackerMultiRef->changeCameraSize( width, height );
+		mTrackerSingleRef->changeCameraSize( width, height );
 
 		mTrackerSingleRef->setPatternWidth( options.mPatternWidth );
 		if ( options.mMode == MARKER_ID_BCH )
