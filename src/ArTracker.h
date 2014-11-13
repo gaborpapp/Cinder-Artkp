@@ -113,6 +113,12 @@ class ArTracker
 				//! Sets the multi marker file path to \a cameraFile. Enables multi marker setup.
 				void setMultiMarker( const ci::fs::path &configFile ) { mMultiMarkerFile = configFile; mMultiMarker = true; }
 
+				void setNearClip( float nearClip ) { mNearPlane = nearClip; }
+				float getNearClip() const { return mNearPlane; }
+
+				void setFarClip( float farClip ) { mFarPlane = farClip; }
+				float getFarClip() const { return mFarPlane; }
+
 			protected:
 				MarkerMode mMode = MARKER_ID_SIMPLE;
 				float mNearPlane = 1.f;
